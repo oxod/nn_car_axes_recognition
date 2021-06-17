@@ -74,23 +74,41 @@ def load_data(file_name):
     return samples_transformed
 
 
-is_training = True
+def create_model(input_shape, output_vector_size):
+    X_input = tf.keras.layers.Input(input_shape)
 
-result = load_data('car_axes_stat.json')
-output_vector_size = 4
-X = result[:, 0:-output_vector_size]
-Y = result[:, -output_vector_size:]
+    X = tf.keras.layers.Dense(10)(X_input)
+    X = tf.keras.layers.BatchNormalization(axis=1)(X)
+    X = tf.keras.layers.Activation('relu')(X)
 
-X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.2, random_state=42)
+    X = tf.keras.layers.Dropout(0.2)(X)
+    X = tf.keras.layers.Dense(20)(X)
+    X = tf.keras.layers.BatchNormalization(axis=1)(X)
+    X = tf.keras.layers.Activation('relu')(X)
+
+    X = tf.keras.layers.Dense(output_vector_size)(X)
+    X = tf.keras.layers.Activation('softmax')(X)
+
+    model = tf.keras.models.Model(inputs=X_input, outputs=X)
+    model.summary()
+    return model
 
 
-X = tf.keras.layers.Dense(10)(X)
-X = tf.keras.layers.BatchNormalization(axis=1, trainable=is_training)(X)
-X = tf.keras.layers.Activation('relu')(X)
+def main():
+    output_vector_size = 4
 
-X = tf.keras.layers.Dense(20)(X)
-X = tf.keras.layers.BatchNormalization(axis=1, trainable=is_training)(X)
-X = tf.keras.layers.Activation('relu')(X)
+    result = load_data('car_axes_stat.json')
+    X = result[:, 0:-output_vector_size]
+    Y = result[:, -output_vector_size:]
 
-X = tf.keras.layers.Dense(output_vector_size)(X)
-X = tf.keras.layers.Activation('softmax')(X)
+    X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.2, random_state=42)
+
+    model = create_model(X_train.shape[1], output_vector_size)
+    model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=0.00001), loss='categorical_crossentropy', metrics=['accuracy'])
+    model.fit(X_train, Y_train, epochs=1000, batch_size=32)
+    loss, metrics = model.evaluate(X_test, Y_test, verbose=1)
+    print(loss)
+    print(metrics)
+
+main()
+

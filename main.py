@@ -13,14 +13,7 @@ def get_lorry_type(s_trailer_type):
     }[s_trailer_type]
 
 
-def convert_to_y_vector(output_length, trailer_type_index, lorry_length):
-    r = np.zeros(output_length)
-    r[trailer_type_index] = 1
-    r[-1] = lorry_length
-    return r
-
-
-def load_data(file_name):
+def load_data(file_name, output_vector_size):
     with open(file_name) as json_file:
         data = json.load(json_file)
         data = data['WeightingItem']
@@ -32,7 +25,6 @@ def load_data(file_name):
 
     # concatenate linked tractors and trailers
     # convert trailer type into index vector + tractor length as output sample vector
-    output_length = 4 # 3  binary values for each category softmax output + 1 delimiter of tractor-n-trailer
     for trac in tractors:
         trail = next((t for t in trailers if t['id'] == trac['trailer_link']), None)
         d_lorry = [float(s_dist) for s_dist in trac['dist'].split(' ')]
@@ -44,7 +36,10 @@ def load_data(file_name):
             for t_dist in trail['dist'].split(' '):
                 d_lorry.append(int(t_dist))
 
-        x, y = d_lorry, convert_to_y_vector(output_length, get_lorry_type(s_trail), d_lorry_length)
+        y_vector = tf.keras.utils.to_categorical(get_lorry_type(s_trail), output_vector_size)
+        y_vector[-1] = d_lorry_length
+
+        x, y = d_lorry, y_vector
         samples.append((x, y))
 
     # pad data to have all X samples of the same length
@@ -62,7 +57,7 @@ def load_data(file_name):
 
     # put all X, Y data into 2D np array
     m = len(samples)
-    y_length = max_input_length + output_length
+    y_length = max_input_length + output_vector_size
     samples_transformed = np.empty((m, y_length))
     for i in range(m):
         for j in range(y_length):
@@ -95,9 +90,10 @@ def create_model(input_shape, output_vector_size):
 
 
 def main():
+    # 3  binary values for each category softmax output + 1 delimiter of tractor-n-trailer
     output_vector_size = 4
 
-    result = load_data('car_axes_stat.json')
+    result = load_data('car_axes_stat.json', output_vector_size)
     X = result[:, 0:-output_vector_size]
     Y = result[:, -output_vector_size:]
 
